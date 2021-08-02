@@ -8,7 +8,7 @@
 #include <time.h>
 #include <unistd.h>
 
-
+#include "common.h"
 
 void run_wait();
 void run_play();
@@ -19,37 +19,16 @@ struct game_info_t {
   char winner;
 } game_info;
 
-struct server_com {
-  int mode; // 0 for start a game, 1 for server response, 2 for report result
-  in_addr_t addr; // When client->server, client sends its own server add, when
-                  // server->client, server sents oponnent addr
-  in_port_t port;
-  char play_piece; // X or O
-};
-
-struct matching_server_client_t {
+struct server_info_t {
   in_addr_t addr;
   in_port_t port;
 
   int sockfd;
-} matching_server_client;
-
-struct oponnent_com_t {
-  in_addr_t addr;
-  in_port_t port;
-
-  int sockfd;
-} oponnent_com;
-
-struct receive_server_t {
-  in_addr_t addr;
-  in_port_t port;
-
-  int sockfd;
-} receive_server;
+} matching_server_client, oponnent_com, receive_server;
 
 struct player_t {
   char piece;
+  char name[25];
 } player;
 
 
@@ -99,8 +78,6 @@ int open_server_socket(in_addr_t addr, in_port_t port) {
 void setup_matching_server() {
   matching_server_client.addr = inet_addr("127.0.0.1");
   matching_server_client.port = 9876;
-
-  matching_server_client.sockfd = open_client_socket(matching_server_client.addr, matching_server_client.port);
 }
 
 void setup_receiving_server(in_addr_t addr, in_port_t port) {
@@ -119,7 +96,9 @@ void setup_client_to_oponnent() {
 
 void write_to_matching_server(struct server_com *payload) {
   int len = sizeof(*payload);
+
   write(matching_server_client.sockfd, payload, len);
+
 }
 
 void read_from_matching_server(struct server_com *payload) {
@@ -135,9 +114,12 @@ void get_oponnent() {
   start_request.mode = 0;
   start_request.addr = receive_server.addr;
   start_request.port = receive_server.port;
+  strcpy(start_request.player_name, player.name);
 
+  matching_server_client.sockfd = open_client_socket(matching_server_client.addr, matching_server_client.port);
   write_to_matching_server(&start_request);
   read_from_matching_server(&start_response);
+  close(matching_server_client.sockfd);
 
   player.piece = start_response.play_piece;
 
@@ -294,6 +276,8 @@ void get_play_from_user() {
 
     if (valid != 2) {
       printf("Posição ou valores inválidos.\n");
+      int c;
+      while ((c = getchar()) != '\n' && c != EOF) { }
     }
   } while(valid != 2);
 
@@ -320,12 +304,24 @@ void finish_game() {
 
   close(oponnent_com.sockfd);
 
+  if (game_info.winner == player.piece) {
+    printf("Notificando servidor que você venceu...\n");
+    struct server_com payload;
+    payload.mode = 2;
+    payload.play_piece = player.piece;
+    strcpy(payload.player_name, player.name);
+    matching_server_client.sockfd = open_client_socket(matching_server_client.addr, matching_server_client.port);
+    write_to_matching_server(&payload);
+    close(matching_server_client.sockfd);
+  }
+
   close(matching_server_client.sockfd);
 
   exit(0);
 }
 
 void run_wait() {
+  printf("--------------------\n");
   printf("Waiting oponnet to play...\n");
 
   struct play_info op_play;
@@ -336,7 +332,7 @@ void run_wait() {
 
   int result =  check_result();
 
-  if (result < 1) {
+  if (result == -1) {
     printf("O jogo empatou!\n");
     game_info.winner = 'E';
   } else if (result > 0) {
@@ -353,10 +349,11 @@ void run_wait() {
 }
 
 void run_play() {
+  printf("--------------------\n");
+  printf("Sua vez!\n");
   show_table();
 
   get_play_from_user();
-
   printf("Tabuleiro atual:\n");
   show_table();
 
@@ -393,10 +390,13 @@ void run_game() {
 
 
 int main(int argc, char *argv[]) {
-  if (argc < 2) {
+  if (argc < 3) {
     printf("Mising port input value\n");
+    printf("Usade: ./client.o <port:int> <name:char[25]>");
     exit(1);
   }
+
+  strcpy(player.name, argv[2]);
 
   setup_matching_server();
   setup_receiving_server(inet_addr("127.0.0.1"), atoi(argv[1]));
@@ -404,7 +404,7 @@ int main(int argc, char *argv[]) {
   get_oponnent();
 
   printf("Player piece is %c\n", player.piece);
-  printf("Oponent is at %d:%d\n", oponnent_com.addr, oponnent_com.port);
+  printf("Oponnent is at %d:%d\n", oponnent_com.addr, oponnent_com.port);
 
   init_game();
   run_game();
