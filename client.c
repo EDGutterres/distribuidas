@@ -9,7 +9,11 @@
 #include <unistd.h>
 
 
-char game[3][3];
+
+struct game_info_t {
+  char table[3][3];
+  int plays_count;
+} game_info;
 
 struct server_com {
   int mode; // 0 for start a game, 1 for server response, 2 for report result
@@ -46,7 +50,7 @@ struct player_t {
 
 
 struct play_info {
-  int test;
+  char table[3][3];
 };
 
 int open_client_socket(in_addr_t serv_addr, in_port_t port) {
@@ -161,19 +165,19 @@ void init_game() {
 
   for(i=0; i<3; i++) {
     for(j=0; j<3; j++) {
-      game[i][j] = ' ';
+      game_info.table[i][j] = ' ';
     }
   }
 }
 
-int isValid(char letter) {
+int is_valid(char letter) {
   if(letter == 'X' || letter == 'O')
     return 1;
   else
     return 0;
 }
 
-int coordIsValid(int x, int y) {
+int coord_is_valid(int x, int y) {
   if(x >= 0 && x < 3) {
     if(y >= 0 && y < 3)
       return 1;
@@ -181,17 +185,17 @@ int coordIsValid(int x, int y) {
   return 0;
 }
 
-int emptyPos(int x, int y) {
-  if(game[x][y] != 'X' && game[x][y] != 'O')
+int empty_pos(int x, int y) {
+  if(game_info.table[x][y] != 'X' && game_info.table[x][y] != 'O')
     return 1;
   return 0;
 }
 
-int winByLine() {
+int win_by_line() {
   int i, j, equal = 1;
   for(i = 0; i < 3; i++) {
     for(j = 0; j < 2; j++) {
-      if(isValid(game[i][j]) && game[i][j] == game[i][j+1])
+      if(is_valid(game_info.table[i][j]) && game_info.table[i][j] == game_info.table[i][j+1])
         equal++;
     }
     if(equal == 3)
@@ -201,11 +205,11 @@ int winByLine() {
   return 0;
 }
 
-int winByCol() {
+int win_by_col() {
   int i, j, equal = 1;
   for(i = 0; i < 3; i++) {
     for(j = 0; j < 2; j++) {
-      if(isValid(game[j][i]) && game[j][i] == game[j+1][i])
+      if(is_valid(game_info.table[j][i]) && game_info.table[j][i] == game_info.table[j+1][i])
         equal++;
     }
     if(equal == 3)
@@ -215,10 +219,10 @@ int winByCol() {
   return 0;
 }
 
-int winPrimmaryDiag() {
+int win_primary_diag() {
   int i, equal = 1;
   for(i = 0; i < 2; i++) {
-    if(isValid(game[i][i]) && game[i][i] == game[i+1][i+1])
+    if(is_valid(game_info.table[i][i]) && game_info.table[i][i] == game_info.table[i+1][i+1])
       equal++;
   }
   if(equal == 3)
@@ -227,10 +231,10 @@ int winPrimmaryDiag() {
     return 0;
 }
 
-int winSecundaryDiag() {
+int win_secondary_diag() {
   int i, equal = 1;
   for(i = 0; i < 2; i++) {
-    if(isValid(game[i][3-i-1]) && game[i][3-i-1] == game[i+1][3-i-2])
+    if(is_valid(game_info.table[i][3-i-1]) && game_info.table[i][3-i-1] == game_info.table[i+1][3-i-2])
       equal++;
   }
   if(equal == 3)
@@ -239,7 +243,7 @@ int winSecundaryDiag() {
     return 0;
 }
 
-void show() {
+void show_table() {
   int lin, col;
 
   printf("\n\t    0  1  2\n");
@@ -247,13 +251,14 @@ void show() {
     printf("\t%d ", lin);
     for(col = 0; col < 3; col++) {
       if(col < 2)
-        printf(" %c |", game[lin][col]);
+        printf(" %c |", game_info.table[lin][col]);
       else
-        printf(" %c ", game[lin][col]);
+        printf(" %c ", game_info.table[lin][col]);
     }
     if(lin < 2)
       printf("\n\t   ---------\n");
   }
+  printf("\n");
 }
 
 void play() {
@@ -261,29 +266,30 @@ void play() {
 
   do {
     do {
-      show();
+      show_table();
       printf("\nDigite a coordenada que deseja jogar: ");
       scanf("%d%d", &x, &y);
-      valid = coordIsValid(x, y);
+      valid = coord_is_valid(x, y);
       if(valid == 1)
-        valid += emptyPos(x, y);
+        valid += empty_pos(x, y);
     } while(valid != 2);
     if(order == 1) {
-      game[x][y] = 'X';
+      game_info.table[x][y] = 'X';
     } else {
-      game[x][y] = 'O';
+      game_info.table[x][y] = 'O';
     }
     plays++;
     order++;
     if(order == 3)
       order = 1;
-    win += winByLine();
-    win += winByCol();
-    win += winPrimmaryDiag();
-    win +- winSecundaryDiag();
+    win += win_by_line();
+    win += win_by_col();
+    win += win_primary_diag();
+    win +- win_secondary_diag();
   } while (win == 0 && plays < 9);
+
   if(win != 0) {
-    show();
+    show_table();
     if(order - 1 == 1)
       printf("\nParabens. Voce venceu %s\n", "jogador1");
     else
@@ -292,12 +298,59 @@ void play() {
       printf("\nEmpatou!!\n\n");
 }
 
+void receive_table(struct play_info op_play) {
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      game_info.table[i][j] = op_play.table[i][j];
+    }
+  }
+}
+
+void fill_table_payload(struct play_info * play) {
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      play->table[i][j] = game_info.table[i][j];
+    }
+  }
+}
+
+void run_wait() {
+  printf("Waiting oponnet to play...\n");
+
+  struct play_info op_play;
+  receive_from_oponnent(&op_play);
+
+  receive_table(op_play);
+  game_info.plays_count += 1;
+}
+
+void run_play() {
+  show_table();
+  
+  // deal with making a play
+
+
+  struct play_info play;
+  fill_table_payload(&play);
+  send_to_oponnent(&play);
+  game_info.plays_count += 1;
+}
+
+void run_game() {
+  if (player.piece == 'X') {
+    run_play();
+  } else {
+    run_wait();
+  }
+}
+
 
 int main(int argc, char *argv[]) {
   if (argc < 2) {
     printf("Mising port input value\n");
     exit(1);
   }
+
   setup_matching_server();
   setup_receiving_server(inet_addr("127.0.0.1"), atoi(argv[1]));
 
@@ -306,16 +359,8 @@ int main(int argc, char *argv[]) {
   printf("Player piece is %c\n", player.piece);
   printf("Oponent is at %d:%d\n", oponnent_com.addr, oponnent_com.port);
 
-  if (player.piece == 'X') {
-    sleep(2);
-    struct play_info payload = {42};
-    send_to_oponnent(&payload);
+  init_game();
+  run_game();
 
-  } else {
-    struct play_info payload;
-
-    receive_from_oponnent(&payload);
-
-    printf("Received from oponnent: %d", payload.test);
-  }
+  return 0;
 }
