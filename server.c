@@ -32,15 +32,17 @@ int open_server_socket() {
 
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
   address.sin_family = AF_INET;
-  address.sin_addr.s_addr = htonl(INADDR_ANY);
+   
   address.sin_port = 9876;
 
   len = sizeof(address);
 
-  result =
-      bind(sockfd, (struct sockaddr *)&address, len);
-
+  result = bind(sockfd, (struct sockaddr *)&address, len);
   printf("Server binding: %d\n", result);
+
+  if (result < 0) {
+    exit(1);
+  }
 
   return sockfd;
 }
