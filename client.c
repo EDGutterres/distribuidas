@@ -10,9 +10,13 @@
 
 
 
+void run_wait();
+void run_play();
+
 struct game_info_t {
   char table[3][3];
   int plays_count;
+  char winner;
 } game_info;
 
 struct server_com {
@@ -261,42 +265,6 @@ void show_table() {
   printf("\n");
 }
 
-void play() {
-  int x, y, valid, plays = 0, win = 0, order = 1;
-
-  do {
-    do {
-      show_table();
-      printf("\nDigite a coordenada que deseja jogar: ");
-      scanf("%d%d", &x, &y);
-      valid = coord_is_valid(x, y);
-      if(valid == 1)
-        valid += empty_pos(x, y);
-    } while(valid != 2);
-    if(order == 1) {
-      game_info.table[x][y] = 'X';
-    } else {
-      game_info.table[x][y] = 'O';
-    }
-    plays++;
-    order++;
-    if(order == 3)
-      order = 1;
-    win += win_by_line();
-    win += win_by_col();
-    win += win_primary_diag();
-    win +- win_secondary_diag();
-  } while (win == 0 && plays < 9);
-
-  if(win != 0) {
-    show_table();
-    if(order - 1 == 1)
-      printf("\nParabens. Voce venceu %s\n", "jogador1");
-    else
-      printf("\nParabens. Voce venceu %s\n", "jogador2");
-  } else
-      printf("\nEmpatou!!\n\n");
-}
 
 void receive_table(struct play_info op_play) {
   for (int i = 0; i < 3; i++) {
@@ -314,6 +282,49 @@ void fill_table_payload(struct play_info * play) {
   }
 }
 
+void get_play_from_user() {
+  int valid, x, y;
+
+  do {
+    printf("\nDigite a coordenada que deseja jogar (formato x,y): ");
+    scanf("%d,%d", &x, &y);
+    valid = coord_is_valid(x, y);
+    if(valid == 1)
+      valid += empty_pos(x, y);
+
+    if (valid != 2) {
+      printf("Posição ou valores inválidos.\n");
+    }
+  } while(valid != 2);
+
+  game_info.table[x][y] = player.piece;
+}
+
+int check_result() {
+  int win = 0;
+
+  win += win_by_line();
+  win += win_by_col();
+  win += win_primary_diag();
+  win += win_secondary_diag();
+
+  if (win == 0 && game_info.plays_count == 9) {
+    return -1;
+  } 
+
+  return win;
+}
+
+void finish_game() {
+  close(receive_server.sockfd);
+
+  close(oponnent_com.sockfd);
+
+  close(matching_server_client.sockfd);
+
+  exit(0);
+}
+
 void run_wait() {
   printf("Waiting oponnet to play...\n");
 
@@ -322,24 +333,60 @@ void run_wait() {
 
   receive_table(op_play);
   game_info.plays_count += 1;
+
+  int result =  check_result();
+
+  if (result < 1) {
+    printf("O jogo empatou!\n");
+    game_info.winner = 'E';
+  } else if (result > 0) {
+    show_table();
+    printf("Você perdeu.\n");
+    game_info.winner = (player.piece == 'X' ? 'O' : 'X');
+  }
+
+  if (result != 0) { 
+    finish_game();
+  }
+
+  run_play();
 }
 
 void run_play() {
   show_table();
-  
-  // deal with making a play
 
+  get_play_from_user();
+
+  printf("Tabuleiro atual:\n");
+  show_table();
 
   struct play_info play;
   fill_table_payload(&play);
   send_to_oponnent(&play);
   game_info.plays_count += 1;
+
+  int result = check_result();
+  if (result > 0) {
+    printf("Você venceu!\n");
+    game_info.winner = player.piece;
+  } else if (result == -1) {
+    printf("O jogo empatou.");
+    game_info.winner = 'E';
+  }
+
+  if (result != 0) {
+    finish_game();
+  }
+
+  run_wait();
 }
 
 void run_game() {
   if (player.piece == 'X') {
+    printf("Você começa!\n");
     run_play();
   } else {
+    printf("Seu oponente começa.\n");
     run_wait();
   }
 }
