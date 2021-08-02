@@ -268,14 +268,14 @@ void get_play_from_user() {
   int valid, x, y;
 
   do {
-    printf("\nDigite a coordenada que deseja jogar (formato x,y): ");
+    printf("\nEnter the coordinate you want to play (format x,y): ");
     scanf("%d,%d", &x, &y);
     valid = coord_is_valid(x, y);
     if(valid == 1)
       valid += empty_pos(x, y);
 
     if (valid != 2) {
-      printf("Posição ou valores inválidos.\n");
+      printf("Invalid position.\n");
       int c;
       while ((c = getchar()) != '\n' && c != EOF) { }
     }
@@ -305,7 +305,7 @@ void finish_game() {
   close(oponnent_com.sockfd);
 
   if (game_info.winner == player.piece) {
-    printf("Notificando servidor que você venceu...\n");
+    printf("Notifying server that you have won...\n");
     struct server_com payload;
     payload.mode = 2;
     payload.play_piece = player.piece;
@@ -313,6 +313,15 @@ void finish_game() {
     matching_server_client.sockfd = open_client_socket(matching_server_client.addr, matching_server_client.port);
     write_to_matching_server(&payload);
     close(matching_server_client.sockfd);
+  } else if (game_info.winner == 'E'){
+      printf("Notifying server that the game drawn...\n");
+      struct server_com payload;
+      payload.mode = 3;
+      payload.play_piece = player.piece;
+      strcpy(payload.player_name, player.name);
+      matching_server_client.sockfd = open_client_socket(matching_server_client.addr, matching_server_client.port);
+      write_to_matching_server(&payload);
+      close(matching_server_client.sockfd);
   }
 
   close(matching_server_client.sockfd);
@@ -322,7 +331,7 @@ void finish_game() {
 
 void run_wait() {
   printf("--------------------\n");
-  printf("Waiting oponnet to play...\n");
+  printf("Waiting oponnent to make a play...\n");
 
   struct play_info op_play;
   receive_from_oponnent(&op_play);
@@ -333,11 +342,11 @@ void run_wait() {
   int result =  check_result();
 
   if (result == -1) {
-    printf("O jogo empatou!\n");
+    printf("Game Draw!\n");
     game_info.winner = 'E';
   } else if (result > 0) {
     show_table();
-    printf("Você perdeu.\n");
+    printf("You Lost.\n");
     game_info.winner = (player.piece == 'X' ? 'O' : 'X');
   }
 
@@ -350,11 +359,11 @@ void run_wait() {
 
 void run_play() {
   printf("--------------------\n");
-  printf("Sua vez!\n");
+  printf("Your turn!\n");
   show_table();
 
   get_play_from_user();
-  printf("Tabuleiro atual:\n");
+  printf("Current board:\n");
   show_table();
 
   struct play_info play;
@@ -364,10 +373,10 @@ void run_play() {
 
   int result = check_result();
   if (result > 0) {
-    printf("Você venceu!\n");
+    printf("You won!\n");
     game_info.winner = player.piece;
   } else if (result == -1) {
-    printf("O jogo empatou.");
+    printf("Game Draw.\n");
     game_info.winner = 'E';
   }
 
@@ -380,10 +389,10 @@ void run_play() {
 
 void run_game() {
   if (player.piece == 'X') {
-    printf("Você começa!\n");
+    printf("You start!\n");
     run_play();
   } else {
-    printf("Seu oponente começa.\n");
+    printf("Your oponnent starts.\n");
     run_wait();
   }
 }
@@ -391,7 +400,7 @@ void run_game() {
 
 int main(int argc, char *argv[]) {
   if (argc < 4) {
-    printf("Mising port input value\n");
+    printf("Missing port input value\n");
     printf("Usade: ./client.o <port:int> <name:char[25]> <server_ip:char[]");
     exit(1);
   }

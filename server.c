@@ -24,6 +24,7 @@ struct client_t {
 struct player_results {
   char name[25];
   int wins;
+  int draws;
 };
 struct player_results results[30];
 int next_result_slot = 0;
@@ -114,7 +115,8 @@ void process_play_request(int client_sockfd, struct server_com * curr_message) {
     }
 }
 
-int increment_player_wins(char player_name[25]) {
+int increment_player_wins(struct server_com * curr_message) {
+  char* player_name = curr_message->player_name;
   int i;
   for (i = 0; i < next_result_slot; i++) {
     if (strcmp(player_name, results[i].name) == 0) {
@@ -126,6 +128,19 @@ int increment_player_wins(char player_name[25]) {
   return -1;
 }
 
+int increment_player_draw(struct server_com * curr_message) {
+  char* player_name = curr_message->player_name;
+  int i;
+  for (i = 0; i < next_result_slot; i++) {
+    if (strcmp(player_name, results[i].name) == 0) {
+      results[i].draws++;
+      return results[i].draws;
+    }
+  }
+
+  return -1;
+}
+/*
 void register_win(struct server_com * curr_message) {
   int current_wins = increment_player_wins(curr_message->player_name);
 
@@ -136,6 +151,37 @@ void register_win(struct server_com * curr_message) {
   }
 }
 
+void register_draw(struct server_com * curr_message) {
+  int current_draw = increment_player_draw(curr_message->player_name);
+  if (current_draw == -1) {
+    printf("Player %s not found!", curr_message->player_name);
+  } else {
+    printf("Player: %s\nDraw:%d\n", curr_message->player_name, current_draw);
+  }
+}
+*/
+
+void get_points(struct server_com * curr_message) {
+  char* player_name = curr_message->player_name;
+
+  int i, draw_points, win_points, resul;
+
+  for (i = 0; i < next_result_slot; i++) {
+    if (strcmp(player_name, results[i].name) == 0) {
+      draw_points = results[i].draws;
+      win_points = results[i].wins;
+    }
+  }
+
+  draw_points *= 1;
+  win_points *= 3;
+  resul = draw_points + win_points;
+  if (resul == -1) {
+    printf("Player %s not found!", curr_message->player_name);
+  } else {
+    printf("Player: %s\nPontuação:%d\n", curr_message->player_name, resul);
+  }
+}
 
 int main() {
   int server_sockfd, client_sockfd;
@@ -165,7 +211,14 @@ int main() {
         process_play_request(client_sockfd, &curr_message);
         break;
       case 2:
-        register_win(&curr_message);
+        //register_win(&curr_message);
+        increment_player_wins(&curr_message);
+        get_points(&curr_message);
+        break;
+      case 3:
+        //register_draw(&curr_message);
+        increment_player_draw(&curr_message);
+        get_points(&curr_message);
         break;
       default:
         printf("Invalid mode: %d", curr_message.mode);
