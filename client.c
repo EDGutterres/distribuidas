@@ -390,16 +390,16 @@ void run_game() {
 
 
 int main(int argc, char *argv[]) {
-  if (argc < 3) {
+  if (argc < 4) {
     printf("Mising port input value\n");
-    printf("Usade: ./client.o <port:int> <name:char[25]>");
+    printf("Usade: ./client.o <port:int> <name:char[25]> <server_ip:char[]");
     exit(1);
   }
 
   strcpy(player.name, argv[2]);
 
   setup_matching_server();
-  setup_receiving_server(inet_addr("127.0.0.1"), atoi(argv[1]));
+  setup_receiving_server(inet_addr(argv[3]), atoi(argv[1]));
 
   get_oponnent();
 
